@@ -243,26 +243,23 @@ if (( keyframes > aligned_frames )); then
 fi
 
 indices_file="$work_dir/indices.txt"
-awk -v n="$keyframes" -v max="$((aligned_frames - 1))" '
-BEGIN {
-  if (n <= 1) {
-    print 0;
-    exit;
-  }
-  last = -1;
-  for (i = 0; i < n; i++) {
-    x = int((i * max) / (n - 1) + 0.5);
-    if (x <= last) {
-      x = last + 1;
-    }
-    if (x > max) {
-      x = max;
-    }
-    print x;
-    last = x;
-  }
-}
-' > "$indices_file"
+: > "$indices_file"
+max_index=$((aligned_frames - 1))
+last=-1
+denom=$((keyframes - 1))
+
+for ((i = 0; i < keyframes; i++)); do
+  # Round to nearest integer: (i*max)/(n-1)
+  idx=$(( (i * max_index + denom / 2) / denom ))
+  if (( idx <= last )); then
+    idx=$((last + 1))
+  fi
+  if (( idx > max_index )); then
+    idx=$max_index
+  fi
+  printf "%d\n" "$idx" >> "$indices_file"
+  last=$idx
+done
 
 echo "[3/4] Extracting ${keyframes} keyframes to ${image_dir}..."
 
@@ -271,16 +268,22 @@ args_file="$work_dir/image_args.txt"
 
 count=1
 while IFS= read -r idx; do
-  file_name="$(printf "%03d_f%04d.jpg" "$count" "$idx")"
+  if ! [[ "$idx" =~ ^[0-9]+$ ]]; then
+    echo "Error: invalid frame index generated: $idx" >&2
+    exit 1
+  fi
+
+  idx_dec=$((10#$idx))
+  file_name="$(printf "%03d_f%04d.jpg" "$count" "$idx_dec")"
   out_img="${image_dir%/}/$file_name"
 
   ffmpeg -hide_banner -loglevel error -y \
     -i "$video_out" \
-    -vf "select='eq(n,${idx})'" \
+    -vf "select='eq(n,${idx_dec})'" \
     -vframes 1 \
     "$out_img"
 
-  echo "--image ${out_img} ${idx} ${strength} \\" >> "$args_file"
+  echo "--image ${out_img} ${idx_dec} ${strength} \\" >> "$args_file"
   count=$((count + 1))
 done < "$indices_file"
 
