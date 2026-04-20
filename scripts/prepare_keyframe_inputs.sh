@@ -261,6 +261,36 @@ for ((i = 0; i < keyframes; i++)); do
   last=$idx
 done
 
+# Validate generated indices are strictly increasing and cover [0, max_index].
+first_idx=""
+last_idx=""
+prev_idx=""
+while IFS= read -r idx; do
+  if ! [[ "$idx" =~ ^[0-9]+$ ]]; then
+    echo "Error: generated non-numeric index: $idx" >&2
+    exit 1
+  fi
+
+  if [[ -z "$first_idx" ]]; then
+    first_idx="$idx"
+  fi
+
+  if [[ -n "$prev_idx" ]] && (( idx <= prev_idx )); then
+    echo "Error: generated indices are not strictly increasing (${prev_idx} -> ${idx})." >&2
+    echo "Hint: ensure this script is up to date and run with bash (not sh)." >&2
+    exit 1
+  fi
+
+  prev_idx="$idx"
+  last_idx="$idx"
+done < "$indices_file"
+
+if [[ "$first_idx" != "0" || "$last_idx" != "$max_index" ]]; then
+  echo "Error: generated index range is invalid (first=${first_idx}, last=${last_idx}, expected 0..${max_index})." >&2
+  echo "Hint: ensure this script is up to date and run with bash (not sh)." >&2
+  exit 1
+fi
+
 echo "[3/4] Extracting ${keyframes} keyframes to ${image_dir}..."
 
 args_file="$work_dir/image_args.txt"
