@@ -30,7 +30,7 @@ tmp
 *.gif
 *.heic
 *.heif
-*.jpg
+
 *.jpeg
 *.json
 *.m4a
